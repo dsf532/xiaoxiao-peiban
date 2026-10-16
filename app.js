@@ -945,6 +945,11 @@
       story.title = res.title;
       story.chunks = res.chunks;
       story.useClone = cloneVoiceReady() && settings.soundOn;
+      // 退到手机自带朗读时说明一句，免得以为是坏了
+      if (!story.useClone && missingSetup() && !story.tipShown) {
+        story.tipShown = true;
+        toast("现在用手机自带朗读 · 想听 TA 的声音要用完整链接", 5200);
+      }
       story.active = true;
       renderStoryShell();
       storyPlayBtn.disabled = false;
@@ -1027,8 +1032,9 @@
     return new TextDecoder("utf-8").decode(bytes);
   }
 
-  function applyActivationFromHash() {
-    var raw = (location.hash || "").replace(/^#/, "");
+  // 解析 "#c=..." / "#k=..." 这类配置串；成功则写入本机存储并返回 true
+  function applyConfigFromHashString(raw) {
+    raw = String(raw || "").replace(/^[#?]+/, "");
     if (!raw) return false;
 
     var q = {};
@@ -1070,11 +1076,17 @@
     if (q.v) { settings.ttsVoice = q.v.trim(); settings.ttsMode = "qwen"; applied = true; }
 
     if (applied) writeLS(LS.settings, settings);
+    return applied;
+  }
 
+  function applyActivationFromHash() {
+    var raw = (location.hash || "").replace(/^#/, "");
+    if (!raw) return false;
+    if (!applyConfigFromHashString(raw)) return false;
+    // 读进本机存储后，立刻把密钥从地址栏抹掉（聊天记录、截屏里都不留）
     try { window.history.replaceState(null, "", location.pathname + location.search); }
     catch (e) { location.hash = ""; }
-
-    return applied;
+    return true;
   }
 
   /* ---------- settings sheet ---------- */
@@ -1250,10 +1262,69 @@
     closeSheet();
   });
 
+  /* ---------- 链接不完整时的引导 ---------- */
+  // 场景：拿到的是一条"裸链接"（结尾没有 #c= 那段），本机也从没配对过。
+  // 此时聊天和克隆音色都用不了，必须明确告诉她怎么办，而不是默默退到手机自带朗读。
+
+  function missingSetup() {
+    return !settings.apiKey && !settings.ttsApiKey && !settings.ttsVoice;
+  }
+
+  // 从粘贴进来的任意文本里抠出配置片段：整条链接 / #c=xxx / 裸 base64 / 明文 sk- Key
+  // 注意：从聊天里复制往往会把前后说明文字一起带上，必须按 URL 合法字符截断。
+  function extractHashFromText(text) {
+    text = String(text || "").trim();
+    if (!text) return "";
+
+    var i = text.indexOf("#");
+    var seg = (i >= 0 ? text.slice(i + 1) : text).replace(/^[#?&]+/, "");
+    var m = seg.match(/^[A-Za-z0-9._~%+=&:\/-]+/);
+    seg = m ? m[0] : "";
+    if (/^(c|k|t|v|tm|n)=/.test(seg)) return seg;
+
+    var m2 = text.match(/[?&]([ckt])=[A-Za-z0-9._~%+=-]+/);
+    if (m2) return m2[0].replace(/^[?&]/, "");
+    if (/^sk-[A-Za-z0-9._-]{8,}$/.test(text)) return "k=" + text;
+    if (/^[A-Za-z0-9_-]{40,}$/.test(text)) return "c=" + text;
+    return seg;
+  }
+
+  function renderSetupTip() {
+    var tip = $("setupTip");
+    if (!tip) return;
+    tip.hidden = !missingSetup();
+  }
+
+  function bindSetupTip() {
+    var btn = $("setupPasteBtn");
+    if (!btn) return;
+    var box = $("setupPaste");
+    var msg = $("setupMsg");
+    btn.addEventListener("click", function () {
+      box.hidden = !box.hidden;
+      if (!box.hidden) $("setupInput").focus();
+    });
+    $("setupApply").addEventListener("click", function () {
+      var typed = String($("setupInput").value || "").trim();
+      if (!typed) { msg.className = "setup-msg err"; msg.textContent = "先把完整链接粘进来"; return; }
+      var raw = extractHashFromText(typed);
+      if (!raw || !applyConfigFromHashString(raw)) {
+        msg.className = "setup-msg err";
+        msg.textContent = "没解析出配对信息，确认粘的是完整链接（结尾带 #c= 那段）";
+        return;
+      }
+      msg.className = "setup-msg ok";
+      msg.textContent = "配对成功，正在刷新…";
+      window.setTimeout(function () { location.reload(); }, 700);
+    });
+  }
+
   /* ---------- boot ---------- */
 
   function boot() {
     var activated = applyActivationFromHash();
+    renderSetupTip();
+    bindSetupTip();
     renderSound();
     applyPhoto();
     renderHistory();

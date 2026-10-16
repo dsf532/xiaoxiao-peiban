@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 
@@ -32,6 +32,26 @@
       </button>
     </div>
   </header>
+
+  <!-- 链接不完整时才出现：引导她拿到带配对信息的完整链接 -->
+  <section class="setup-tip" id="setupTip" hidden>
+    <div class="setup-head">
+      <span class="setup-badge" aria-hidden="true">!</span>
+      <div>
+        <p class="setup-title">这条链接不完整</p>
+        <p class="setup-desc">
+          它没带上配对信息，聊天和 TA 的声音都用不了。<br>
+          让 TA 重新发一条<b>完整的链接</b>给你（结尾带 <code>#c=</code> 的那串）。
+        </p>
+      </div>
+    </div>
+    <button type="button" class="setup-btn" id="setupPasteBtn">我手上就有完整链接，粘进来</button>
+    <div class="setup-paste" id="setupPaste" hidden>
+      <textarea id="setupInput" rows="3" placeholder="把完整链接整条粘到这里"></textarea>
+      <button type="button" class="setup-btn primary" id="setupApply">使用这条链接</button>
+      <p class="setup-msg" id="setupMsg"></p>
+    </div>
+  </section>
 
   <section class="stage" aria-label="陪伴角色">
     <div id="statusPill" class="status-pill">正在等你</div>
@@ -209,7 +229,7 @@
   </div>
 </div>
 
-<script src="config.js?v=9"></script>
-<script src="app.js?v=9"></script>
+<script src="config.js?v=10"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>
