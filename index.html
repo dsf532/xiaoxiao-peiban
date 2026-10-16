@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FDF6EE">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="小小陪伴">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>小小陪伴</title>
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css?v=9">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <p class="eyebrow">专属陪伴</p>
+      <h1>小小陪伴</h1>
+    </div>
+    <div class="top-actions">
+      <button id="soundToggle" class="icon-btn" type="button" title="声音开关" aria-label="声音开关">
+        <svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M16 9.4a4 4 0 0 1 0 5.2"/><path d="M19.2 6.8a8 8 0 0 1 0 10.4"/></svg>
+        <svg class="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="m16.5 9.5 5 5M21.5 9.5l-5 5"/></svg>
+      </button>
+      <button id="settingsBtn" class="icon-btn" type="button" title="设置" aria-label="设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7.5h9M18.5 7.5H20M4 16.5h4M13.5 16.5H20"/><circle cx="15.5" cy="7.5" r="2.1"/><circle cx="10.5" cy="16.5" r="2.1"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <section class="stage" aria-label="陪伴角色">
+    <div id="statusPill" class="status-pill">正在等你</div>
+    <div class="pet-wrap" id="petWrap">
+      <div class="halo"></div>
+      <div class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></div>
+      <img id="pet" class="pet" alt="陪伴角色" draggable="false">
+    </div>
+    <div class="floor"></div>
+  </section>
+
+  <section class="chat" id="chat" aria-live="polite"></section>
+
+  <div class="quick" id="quick">
+    <button type="button" class="quick-story" data-story="1">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.6 3.2a8.8 8.8 0 1 0 5.2 15.6 7.4 7.4 0 0 1-5.2-15.6z"/></svg>
+      <span>睡前故事</span>
+    </button>
+    <button type="button" data-msg="今天过得怎么样呀？">聊聊今天</button>
+    <button type="button" data-msg="今天好累，有点难过">安慰我</button>
+    <button type="button" data-msg="说一句晚安吧">晚安</button>
+    <button type="button" data-msg="我想你了">想你</button>
+    <button type="button" data-msg="夸夸我">夸夸我</button>
+  </div>
+
+  <form class="composer" id="composer">
+    <input id="input" type="text" placeholder="和我说句话…" autocomplete="off" maxlength="500" aria-label="输入消息">
+    <button id="micBtn" class="icon-btn ghost" type="button" title="语音输入" aria-label="语音输入">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9.2" y="2.6" width="5.6" height="11" rx="2.8"/><path d="M5.2 11.4a6.8 6.8 0 0 0 13.6 0"/><path d="M12 18.2V21"/></svg>
+    </button>
+    <button class="send" type="submit">发送</button>
+  </form>
+
+</div>
+
+<div class="sheet-mask" id="sheetMask"></div>
+
+<aside class="sheet" id="sheet" aria-label="设置">
+  <div class="sheet-grab"></div>
+  <div class="sheet-head">
+    <h2>设置</h2>
+    <button id="sheetClose" class="icon-btn" type="button" aria-label="关闭">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/></svg>
+    </button>
+  </div>
+
+  <div class="sheet-body">
+
+    <section class="fieldset">
+      <h3>聊天大脑</h3>
+      <label class="field">
+        <span>服务商</span>
+        <select id="provider">
+          <option value="deepseek">DeepSeek</option>
+          <option value="dashscope">通义千问（DashScope）</option>
+          <option value="custom">自定义（OpenAI 兼容）</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>接口地址</span>
+        <input id="baseUrl" type="text" placeholder="https://api.deepseek.com/v1">
+      </label>
+      <label class="field">
+        <span>模型</span>
+        <input id="model" type="text" placeholder="deepseek-chat">
+      </label>
+      <label class="field">
+        <span>API Key</span>
+        <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off">
+      </label>
+      <label class="field">
+        <span>人设</span>
+        <textarea id="persona" rows="5"></textarea>
+      </label>
+      <label class="field">
+        <span>她希望被怎么称呼</span>
+        <input id="nickname" type="text" placeholder="留空则不加称呼" maxlength="20">
+      </label>
+      <label class="check">
+        <input id="noThink" type="checkbox">
+        <span>快速模式（关闭模型思考，回复更快更省）</span>
+      </label>
+      <div class="row">
+        <button id="testBtn" class="btn ghost-btn" type="button">测试连接</button>
+        <span id="testResult" class="hint"></span>
+      </div>
+      <p class="note">Key 只保存在这台设备的浏览器里，不会上传到任何服务器。</p>
+    </section>
+
+    <section class="fieldset">
+      <h3>声音</h3>
+      <label class="field">
+        <span>说话的声音</span>
+        <select id="ttsMode">
+          <option value="browser">手机自带语音（免费）</option>
+          <option value="qwen">我的克隆声音（阿里云百炼）</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>百炼 API Key</span>
+        <input id="ttsApiKey" type="password" placeholder="sk-..." autocomplete="off">
+      </label>
+      <label class="field">
+        <span>音色 ID</span>
+        <input id="ttsVoice" type="text" placeholder="qwen-audio-3.0-tts-flash-xxx-xxxx" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>合成模型（要和复刻时一致）</span>
+        <input id="ttsModel" type="text" placeholder="qwen-audio-3.0-tts-flash" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>系统音色</span>
+        <select id="voiceSelect"></select>
+      </label>
+      <label class="field">
+        <span>语速 <b id="rateVal">0.95</b></span>
+        <input id="rate" type="range" min="0.5" max="1.6" step="0.05" value="0.95">
+      </label>
+      <label class="field">
+        <span>音调 <b id="pitchVal">1.15</b></span>
+        <input id="pitch" type="range" min="0.6" max="1.8" step="0.05" value="1.15">
+      </label>
+      <div class="row">
+        <button id="previewBtn" class="btn ghost-btn" type="button">试听声音</button>
+      </div>
+      <p class="note">用克隆声音时语速音调不生效；合成失败会自动回落到系统语音，不会哑掉。</p>
+    </section>
+
+    <section class="fieldset">
+      <h3>角色形象</h3>
+      <div class="row">
+        <button id="pickPhotoBtn" class="btn ghost-btn" type="button">换一张照片</button>
+        <button id="resetPhotoBtn" class="btn ghost-btn" type="button">恢复默认</button>
+      </div>
+      <input id="photoInput" type="file" accept="image/*" hidden>
+      <p class="note">选一张背景干净的照片效果最好，透明背景的 PNG 最佳。</p>
+    </section>
+
+    <section class="fieldset">
+      <h3>数据</h3>
+      <div class="row">
+        <button id="clearBtn" class="btn ghost-btn danger" type="button">清空聊天记录</button>
+      </div>
+    </section>
+
+  </div>
+</aside>
+
+<div class="story" id="story" aria-hidden="true">
+  <div class="story-sky" id="storySky" aria-hidden="true"></div>
+  <svg class="story-moon" viewBox="0 0 100 100" aria-hidden="true">
+    <defs>
+      <mask id="moonMask">
+        <rect width="100" height="100" fill="#000"/>
+        <circle cx="46" cy="50" r="42" fill="#fff"/>
+        <circle cx="70" cy="40" r="36" fill="#000"/>
+      </mask>
+    </defs>
+    <circle cx="46" cy="50" r="42" fill="#f7e6bb" opacity=".92" mask="url(#moonMask)"/>
+  </svg>
+
+  <div class="story-top">
+    <p class="story-tag">睡前故事</p>
+    <button id="storyClose" class="story-close" type="button" aria-label="关闭">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/></svg>
+    </button>
+  </div>
+
+  <div class="story-body" id="storyBody" aria-live="polite"></div>
+
+  <div class="story-ctrl">
+    <button id="storyPlayBtn" class="story-btn" type="button" disabled>暂停</button>
+    <div class="story-dots" id="storyDots" aria-hidden="true"></div>
+    <button id="storyStopBtn" class="story-btn ghost" type="button" disabled>结束</button>
+  </div>
+</div>
+
+<script src="config.js?v=9"></script>
+<script src="app.js?v=9"></script>
+</body>
+</html>

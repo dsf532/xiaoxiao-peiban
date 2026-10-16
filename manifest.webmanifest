@@ -1,0 +1,14 @@
+{
+  "name": "小小陪伴",
+  "short_name": "小小陪伴",
+  "description": "一个会在手机里陪着你的桌宠",
+  "start_url": "index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fdf7f0",
+  "theme_color": "#fdf7f0",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

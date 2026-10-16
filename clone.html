@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fdf7f0">
+<title>声音复刻工具 · 小小陪伴</title>
+<style>
+  :root {
+    --cream:#fdf7f0; --ink:#3e2f28; --ink2:#8c7365; --ink3:#b4a196;
+    --line:rgba(62,47,40,.12); --card:#fff; --coral:#e4795c; --coral2:#c75f44;
+    --ok:#3b7a5e; --err:#a4342a; --code:#f3ece4;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;min-height:100vh;padding:24px 16px 60px;
+    font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:var(--ink);
+    background:radial-gradient(circle at 50% 0%,#fffdfa,#f7e9dc 70%);
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:640px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 6px}
+  .sub{font-size:13px;color:var(--ink2);margin:0 0 20px;line-height:1.75}
+  .card{background:var(--card);border-radius:16px;padding:18px;box-shadow:0 8px 26px rgba(142,101,64,.12);margin-bottom:14px}
+  .step{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;margin-bottom:14px}
+  .num{width:22px;height:22px;border-radius:50%;background:var(--coral);color:#fff;font-size:12px;display:grid;place-items:center;flex:0 0 auto}
+  label{display:block;margin-bottom:12px}
+  label>span{display:block;font-size:12.5px;color:var(--ink2);margin-bottom:6px}
+  input[type=text],input[type=password],textarea{
+    width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;
+    background:#fcfaf7;font:inherit;font-size:16px;outline:none;
+  }
+  input:focus,textarea:focus{border-color:var(--coral);background:#fff}
+  textarea{font-size:14px;line-height:1.6;resize:vertical}
+  button{
+    padding:12px 20px;border:0;border-radius:12px;cursor:pointer;font:inherit;
+    font-size:15px;font-weight:500;background:linear-gradient(160deg,var(--coral),var(--coral2));
+    color:#fff;box-shadow:0 6px 16px rgba(199,95,68,.26);margin:0 8px 8px 0;
+  }
+  button.ghost{background:#f2e8de;color:var(--ink);box-shadow:none}
+  button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+  button:active:not(:disabled){transform:scale(.97)}
+  .meter{height:44px;border-radius:12px;background:#f6f1ea;overflow:hidden;margin:10px 0;position:relative;display:none}
+  .meter.on{display:block}
+  .meter i{position:absolute;left:0;top:0;bottom:0;width:0%;background:linear-gradient(90deg,#b7e3d2,#e4795c);transition:width .08s linear}
+  .timer{text-align:center;font-size:26px;font-weight:500;color:var(--coral2);margin:8px 0;display:none}
+  .timer.on{display:block}
+  .msg{font-size:13px;line-height:1.7;padding:11px 13px;border-radius:10px;margin-top:10px;word-break:break-all;display:none}
+  .msg.on{display:block}
+  .msg.ok{background:#eaf6f0;color:var(--ok)}
+  .msg.err{background:#fdeceb;color:var(--err)}
+  .msg.info{background:#f2ece5;color:var(--ink2)}
+  pre{background:var(--code);padding:12px;border-radius:10px;font-size:11.5px;line-height:1.55;overflow:auto;max-height:260px;margin:10px 0 0;display:none;white-space:pre-wrap;word-break:break-all}
+  pre.on{display:block}
+  .tip{font-size:12px;color:var(--ink3);line-height:1.8;margin:8px 0 0}
+  audio{width:100%;margin-top:10px}
+  .script{background:#faf6f1;border-radius:12px;padding:14px;font-size:14px;line-height:2;color:#5a463a;margin-bottom:12px}
+  .done{text-decoration:line-through;opacity:.45}
+  .row{display:flex;flex-wrap:wrap;align-items:center;gap:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>声音复刻工具</h1>
+  <p class="sub">
+    用你的声音，让桌宠说任何话。全程在你的浏览器里完成，<strong>不需要服务器</strong>。<br>
+    需要先有一个阿里云百炼（DashScope）的 API Key。
+  </p>
+
+  <!-- 步骤 0 -->
+  <div class="card">
+    <div class="step"><span class="num">0</span>填 API Key</div>
+    <label>
+      <span>DashScope API Key（只存在这台设备，不会上传别处）</span>
+      <input id="key" type="password" placeholder="sk-..." autocomplete="off">
+    </label>
+    <div class="row">
+      <button id="saveKey" class="ghost">保存</button>
+      <button id="checkKey" class="ghost">测试 Key</button>
+    </div>
+    <div id="keyMsg" class="msg"></div>
+  </div>
+
+  <!-- 步骤 1 -->
+  <div class="card">
+    <div class="step"><span class="num">1</span>录一段你的声音</div>
+    <div class="script" id="script">
+      照着念（<strong>必须录满 15 秒以上，建议 20 秒</strong>，正常语速、平静一点）：<br><br>
+      今天天气挺好的，我刚从外面回来。路上看到一只小猫，蹲在花坛边上晒太阳，特别可爱。
+      你要是累了就早点休息，别硬撑，我会一直都在的。
+      对了，晚上记得吃点热的东西，别老是点外卖，对身体不好。
+      我这边一切都好，就是想你了，想多听你说说话。
+    </div>
+    <div class="meter" id="meter"><i id="meterBar"></i></div>
+    <div class="timer" id="timer">20.0</div>
+    <div class="row">
+      <button id="recBtn">开始录音</button>
+      <button id="stopBtn" class="ghost" disabled>提前结束</button>
+    </div>
+    <div id="recMsg" class="msg"></div>
+    <div id="playWrap"></div>
+    <p class="tip">
+      要点：安静环境、离嘴 15 厘米左右、别开背景音乐、别唱歌。<br>
+      录太短（不足 5 秒）阿里云会拒绝，所以别提前结束。<br>
+      录音是 WAV 无损格式，浏览器直接编码，不经过任何服务器。
+    </p>
+  </div>
+
+  <!-- 步骤 2 -->
+  <div class="card">
+    <div class="step"><span class="num">2</span>提交复刻</div>
+    <label>
+      <span>给这个音色起个名字（只能用字母数字和下划线，≤16 位）</span>
+      <input id="vname" type="text" value="myself" maxlength="16">
+    </label>
+    <div class="row">
+      <button id="cloneBtn" disabled>用这段录音复刻我的声音</button>
+    </div>
+    <div id="cloneMsg" class="msg"></div>
+    <pre id="cloneRaw"></pre>
+  </div>
+
+  <!-- 步骤 3 -->
+  <div class="card">
+    <div class="step"><span class="num">3</span>试听效果</div>
+    <label>
+      <span>要它说的话</span>
+      <textarea id="ttsText" rows="2">今天也要开心呀，我一直都在陪着你。</textarea>
+    </label>
+    <div class="row">
+      <button id="ttsBtn" disabled>用我的声音念这句</button>
+    </div>
+    <div id="ttsMsg" class="msg"></div>
+    <div id="ttsAudio"></div>
+    <pre id="ttsRaw"></pre>
+  </div>
+
+  <p class="tip">
+    ✅ 全部搞定后，把音色 ID 填进「小小陪伴」的设置里，它以后就用你的声音说话了。<br>
+    🆕 官方在 2026-10 改版了声音复刻接口，旧版音色已不能使用，需要重新录一次（20 秒就够）。<br>
+    💰 创建音色免费；语音合成 0.8 元 / 万字符（一个睡前故事约 500 字，不到 5 分钱）。
+  </p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var LS_KEY = "clone.dashscope.key";
+  var LS_VOICE = "clone.voice.id";
+  // 2026-10 官方改版：qwen3-tts-vc 系列已下线，改用 qwen-audio-3.0-tts-flash
+  var MODEL = "qwen-audio-3.0-tts-flash";
+  var ENROLL_URL = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization";
+  var TTS_URL = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer";
+  var SECONDS = 20;
+
+  var wavBlob = null;
+  var voiceId = "";
+
+  function say(el, kind, text) {
+    el.className = "msg on " + kind;
+    el.textContent = text;
+  }
+  function clearMsg(el) { el.className = "msg"; el.textContent = ""; }
+
+  /* ---------- key ---------- */
+  try { $("key").value = localStorage.getItem(LS_KEY) || ""; } catch (e) {}
+  try { voiceId = localStorage.getItem(LS_VOICE) || ""; } catch (e) {}
+  // 旧音色（qwen-tts-vc 系列）绑定的模型已被官方下线，必须重新复刻
+  if (/^qwen-tts-vc-/i.test(voiceId)) {
+    voiceId = "";
+    try { localStorage.removeItem(LS_VOICE); } catch (e) {}
+  }
+
+  $("saveKey").addEventListener("click", function () {
+    var k = $("key").value.trim();
+    if (!k) { say($("keyMsg"), "err", "先填 Key"); return; }
+    try { localStorage.setItem(LS_KEY, k); } catch (e) {}
+    say($("keyMsg"), "ok", "已保存在这台设备上。");
+  });
+
+  // 查询已有音色要用 action: "list_voice"（单数！写 "list"/"list_voices" 会被拒 invalid action）
+  $("checkKey").addEventListener("click", function () {
+    var k = $("key").value.trim();
+    if (!k) { say($("keyMsg"), "err", "先填 Key"); return; }
+    say($("keyMsg"), "info", "正在测试…");
+    fetch(ENROLL_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + k },
+      body: JSON.stringify({ model: "voice-enrollment", input: { action: "list_voice" } })
+    }).then(function (r) { return r.text().then(function (t) { return { s: r.status, t: t }; }); })
+      .then(function (res) {
+        if (res.s === 401 || res.s === 403) {
+          say($("keyMsg"), "err",
+            "Key 无效或没有百炼权限（HTTP " + res.s + "）。确认是百炼的 Key，" +
+            "且控制台右上角地域选的是「华北2(北京)」。");
+          return;
+        }
+        if (res.s !== 200) {
+          say($("keyMsg"), "err", "接口返回 HTTP " + res.s + "：" + res.t.slice(0, 180));
+          return;
+        }
+        var d = {};
+        try { d = JSON.parse(res.t); } catch (e) {}
+        var list = ((d.output || {}).voice_list) || [];
+        say($("keyMsg"), "ok", "Key 可用 ✅（这个账号已有 " + list.length + " 个音色）");
+        if (!list.length) return;
+        // 已有音色就不用再录一遍，列出来直接点选
+        var box = document.createElement("div");
+        box.style.cssText = "margin-top:9px;display:flex;flex-direction:column;gap:6px";
+        list.forEach(function (v) {
+          var id = v.voice_id || v.voice || "";
+          if (!id) return;
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "ghost";
+          b.style.cssText = "margin:0;padding:8px 12px;font-size:12.5px;text-align:left;word-break:break-all";
+          b.textContent = "用这个：" + id;
+          b.addEventListener("click", function () {
+            voiceId = id;
+            try { localStorage.setItem(LS_VOICE, id); } catch (e) {}
+            $("ttsBtn").disabled = false;
+            say($("cloneMsg"), "ok", "已选用已有音色：" + id);
+          });
+          box.appendChild(b);
+        });
+        if (box.childNodes.length) $("keyMsg").appendChild(box);
+      })
+      .catch(function (e) { say($("keyMsg"), "err", "请求失败：" + e.message); });
+  });
+
+  /* ---------- 录音 + WAV 编码 ---------- */
+  var audioCtx = null, stream = null, node = null, chunks = [], total = 0;
+  var recording = false, timerId = null, deadline = 0;
+
+  function writeWav(samples, sampleRate) {
+    var len = samples.length;
+    var buf = new ArrayBuffer(44 + len * 2);
+    var view = new DataView(buf);
+    function str(off, s) { for (var i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); }
+    str(0, "RIFF");
+    view.setUint32(4, 36 + len * 2, true);
+    str(8, "WAVE");
+    str(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);          // PCM
+    view.setUint16(22, 1, true);          // 单声道
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true); // byte rate
+    view.setUint16(32, 2, true);          // block align
+    view.setUint16(34, 16, true);         // 16 bit
+    str(36, "data");
+    view.setUint32(40, len * 2, true);
+    var off = 44;
+    for (var i = 0; i < len; i++, off += 2) {
+      var s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    }
+    return new Blob([buf], { type: "audio/wav" });
+  }
+
+  function tick() {
+    var left = (deadline - Date.now()) / 1000;
+    if (left <= 0) { stopRec(); return; }
+    $("timer").textContent = left.toFixed(1);
+  }
+
+  function stopRec() {
+    if (!recording) return;
+    recording = false;
+    clearInterval(timerId);
+    $("timer").classList.remove("on");
+    $("meter").classList.remove("on");
+    $("recBtn").disabled = false;
+    $("stopBtn").disabled = true;
+    try { if (node) node.disconnect(); } catch (e) {}
+    try { if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+
+    if (!chunks.length || !audioCtx) { say($("recMsg"), "err", "没有录到声音。"); return; }
+    var flat = new Float32Array(total);
+    var p = 0;
+    chunks.forEach(function (c) { flat.set(c, p); p += c.length; });
+    chunks = [];
+
+    var rate = audioCtx.sampleRate;
+    // 统一重采样到 24kHz：满足官方「≥16kHz」要求，且体积只有 48kHz 的一半
+    var target = 24000;
+    var out = flat;
+    if (rate !== target) {
+      var ratio = rate / target;
+      var n = Math.max(1, Math.floor(flat.length / ratio));
+      out = new Float32Array(n);
+      for (var i = 0; i < n; i++) {
+        var pos = i * ratio;
+        var i0 = Math.floor(pos);
+        var i1 = Math.min(flat.length - 1, i0 + 1);
+        var f = pos - i0;
+        out[i] = flat[i0] * (1 - f) + flat[i1] * f;   // 线性插值，比直接取整干净
+      }
+    }
+    try { audioCtx.close(); } catch (e) {}
+    audioCtx = null;
+
+    var secs = out.length / target;
+    if (secs < 6) {
+      wavBlob = null;
+      $("playWrap").innerHTML = "";
+      $("cloneBtn").disabled = true;
+      say($("recMsg"), "err",
+        "只录到 " + secs.toFixed(1) + " 秒，太短了。阿里云要求至少 5 秒连续的朗读，" +
+        "建议录满 15～20 秒效果最好。请再录一次。");
+      return;
+    }
+
+    wavBlob = writeWav(out, target);
+    var kb = Math.round(wavBlob.size / 1024);
+    say($("recMsg"), "ok", "录好了：" + secs.toFixed(1) + " 秒 · " + target + " Hz 单声道 · " + kb + " KB");
+
+    var url = URL.createObjectURL(wavBlob);
+    $("playWrap").innerHTML = '<audio controls src="' + url + '"></audio>';
+    $("cloneBtn").disabled = false;
+    clearMsg($("cloneMsg"));
+  }
+
+  $("recBtn").addEventListener("click", function () {
+    if (recording) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      say($("recMsg"), "err", "这个浏览器不支持录音。请用 Chrome / Edge / Safari 打开。");
+      return;
+    }
+    clearMsg($("recMsg"));
+    navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    }).then(function (s) {
+      stream = s;
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new Ctx();
+      var src = audioCtx.createMediaStreamSource(s);
+      node = audioCtx.createScriptProcessor(4096, 1, 1);
+      chunks = []; total = 0;
+      node.onaudioprocess = function (ev) {
+        if (!recording) return;
+        var d = ev.inputBuffer.getChannelData(0);
+        chunks.push(new Float32Array(d));
+        total += d.length;
+        var peak = 0;
+        for (var i = 0; i < d.length; i += 8) { var v = Math.abs(d[i]); if (v > peak) peak = v; }
+        $("meterBar").style.width = Math.min(100, Math.round(peak * 130)) + "%";
+      };
+      src.connect(node);
+      node.connect(audioCtx.destination);
+
+      recording = true;
+      $("recBtn").disabled = true;
+      $("stopBtn").disabled = false;
+      $("meter").classList.add("on");
+      $("timer").classList.add("on");
+      deadline = Date.now() + SECONDS * 1000;
+      $("timer").textContent = SECONDS.toFixed(1);
+      timerId = setInterval(tick, 100);
+    }).catch(function (err) {
+      say($("recMsg"), "err", "拿不到麦克风：" + err.message + "（需要点「允许」，并且要用 https 打开）");
+    });
+  });
+
+  $("stopBtn").addEventListener("click", stopRec);
+
+  /* ---------- 复刻 ---------- */
+  function toDataUri(blob, cb) {
+    var fr = new FileReader();
+    fr.onload = function () { cb(fr.result); };
+    fr.readAsDataURL(blob);
+  }
+
+  $("cloneBtn").addEventListener("click", function () {
+    var k = $("key").value.trim();
+    if (!k) { say($("cloneMsg"), "err", "先填 DashScope API Key"); return; }
+    if (!wavBlob) { say($("cloneMsg"), "err", "先录一段声音"); return; }
+    var name = ($("vname").value.trim() || "myself").replace(/[^A-Za-z0-9_]/g, "");
+    if (!name) name = "myself";
+
+    say($("cloneMsg"), "info", "正在提交复刻…（音频越长约越慢，请稍等）");
+    toDataUri(wavBlob, function (dataUri) {
+      var payload = {
+        model: "voice-enrollment",
+        input: {
+          action: "create_voice",
+          target_model: MODEL,
+          prefix: name,
+          url: dataUri
+        }
+      };
+      var t0 = Date.now();
+      fetch(ENROLL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + k },
+        body: JSON.stringify(payload)
+      }).then(function (r) { return r.text().then(function (t) { return { s: r.status, t: t, ms: Date.now() - t0 }; }); })
+        .then(function (res) {
+          $("cloneRaw").textContent = "HTTP " + res.s + " · " + res.ms + "ms\n" + res.t;
+          $("cloneRaw").classList.add("on");
+          if (res.s !== 200) {
+            say($("cloneMsg"), "err", "复刻失败（HTTP " + res.s + "）。下面是接口原样返回，把它发给我就能定位。");
+            return;
+          }
+          var data;
+          try { data = JSON.parse(res.t); } catch (e) {
+            say($("cloneMsg"), "err", "返回不是合法 JSON。"); return;
+          }
+          var v = (data.output && (data.output.voice_id || data.output.voice)) || "";
+          if (!v) { say($("cloneMsg"), "err", "没找到音色 ID，请看下面的原始返回。"); return; }
+          voiceId = v;
+          try { localStorage.setItem(LS_VOICE, v); } catch (e) {}
+          say($("cloneMsg"), "ok", "复刻成功 ✅");
+          // 音色 ID 要给「小小陪伴」用，这里给个一键复制，省得手动选中
+          var idBox = document.createElement("div");
+          idBox.style.cssText = "margin-top:9px;display:flex;gap:8px;align-items:center;flex-wrap:wrap";
+          var code = document.createElement("code");
+          code.textContent = v;
+          code.style.cssText = "font-size:12.5px;background:rgba(255,255,255,.75);padding:6px 9px;border-radius:8px;word-break:break-all";
+          var cp = document.createElement("button");
+          cp.type = "button";
+          cp.className = "ghost";
+          cp.textContent = "复制音色 ID";
+          cp.style.cssText = "margin:0;padding:8px 14px;font-size:13px";
+          cp.addEventListener("click", function () {
+            var done = function () {
+              cp.textContent = "已复制 ✅";
+              setTimeout(function () { cp.textContent = "复制音色 ID"; }, 1800);
+            };
+            var fallback = function () {
+              var r = document.createRange();
+              r.selectNodeContents(code);
+              var sel = window.getSelection();
+              sel.removeAllRanges();
+              sel.addRange(r);
+              try { document.execCommand("copy"); done(); }
+              catch (e) { cp.textContent = "请手动选中复制"; }
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(v).then(done, fallback);
+            } else fallback();
+          });
+          idBox.appendChild(code);
+          idBox.appendChild(cp);
+          $("cloneMsg").appendChild(idBox);
+          $("ttsBtn").disabled = false;
+
+          // 官方有时会回一段试听音频
+          var pv = (data.output && data.output.preview_audio) || {};
+          if (pv.url || pv.data) {
+            var pu = pv.url || pv.data;
+            if (pu.indexOf("http://") === 0) pu = "https://" + pu.slice(7);
+            $("ttsAudio").innerHTML = '<audio controls autoplay src="' + pu + '"></audio>';
+          }
+        })
+        .catch(function (e) {
+          say($("cloneMsg"), "err", "请求出错：" + e.message + "（可能是网络或跨域问题）");
+        });
+    });
+  });
+
+  /* ---------- 合成 ---------- */
+  $("ttsBtn").addEventListener("click", function () {
+    var k = $("key").value.trim();
+    if (!k) { say($("ttsMsg"), "err", "先填 DashScope API Key"); return; }
+    if (!voiceId) { say($("ttsMsg"), "err", "还没有音色 ID，先完成第 2 步"); return; }
+    var text = $("ttsText").value.trim();
+    if (!text) { say($("ttsMsg"), "err", "写点要它说的话"); return; }
+
+    say($("ttsMsg"), "info", "正在合成…");
+    var t0 = Date.now();
+    fetch(TTS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + k },
+      body: JSON.stringify({
+        model: MODEL,
+        input: { text: text, voice: voiceId, format: "wav", sample_rate: 24000 }
+      })
+    }).then(function (r) { return r.text().then(function (t) { return { s: r.status, t: t, ms: Date.now() - t0 }; }); })
+      .then(function (res) {
+        $("ttsRaw").textContent = "HTTP " + res.s + " · " + res.ms + "ms\n" + res.t.slice(0, 4000);
+        $("ttsRaw").classList.add("on");
+        if (res.s !== 200) { say($("ttsMsg"), "err", "合成失败（HTTP " + res.s + "），看下面的原始返回。"); return; }
+        var data;
+        try { data = JSON.parse(res.t); } catch (e) { say($("ttsMsg"), "err", "返回不是合法 JSON。"); return; }
+        var o = data.output || {};
+        var a = o.audio || {};
+        var url = a.url || a.data || o.audio_url || "";
+        if (!url) {
+          say($("ttsMsg"), "err", "没找到音频地址，请看下面的原始返回（把它发我）。");
+          return;
+        }
+        if (url.indexOf("http://") === 0) url = "https://" + url.slice(7);
+        if (url.indexOf("http") !== 0 && /^[A-Za-z0-9+/=]{200,}$/.test(url)) {
+          url = "data:audio/mp3;base64," + url;
+        }
+        say($("ttsMsg"), "ok", "合成好了（" + res.ms + "ms）");
+        $("ttsAudio").innerHTML = '<audio controls autoplay src="' + url + '"></audio>';
+      })
+      .catch(function (e) { say($("ttsMsg"), "err", "请求出错：" + e.message); });
+  });
+
+  if (voiceId) {
+    say($("cloneMsg"), "info", "检测到上次复刻的音色：" + voiceId);
+    $("ttsBtn").disabled = false;
+  }
+
+  // 供自动化测试调用，不影响页面功能
+  window.__cloneTest = { writeWav: writeWav, model: MODEL };
+})();
+</script>
+</body>
+</html>
