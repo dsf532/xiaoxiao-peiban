@@ -1034,7 +1034,8 @@
 
   // 解析 "#c=..." / "#k=..." 这类配置串；成功则写入本机存储并返回 true
   function applyConfigFromHashString(raw) {
-    raw = String(raw || "").replace(/^[#?]+/, "");
+    // 从聊天/短信里复制长链接时，中间可能被插进换行或空格 —— 先全部去掉再解析
+    raw = String(raw || "").replace(/\s+/g, "").replace(/^[#?]+/, "");
     if (!raw) return false;
 
     var q = {};
@@ -1273,7 +1274,8 @@
   // 从粘贴进来的任意文本里抠出配置片段：整条链接 / #c=xxx / 裸 base64 / 明文 sk- Key
   // 注意：从聊天里复制往往会把前后说明文字一起带上，必须按 URL 合法字符截断。
   function extractHashFromText(text) {
-    text = String(text || "").trim();
+    // 链接从聊天里复制过来时常被换行拆开，先把空白全部去掉再来抠片段
+    text = String(text || "").replace(/\s+/g, "");
     if (!text) return "";
 
     var i = text.indexOf("#");
