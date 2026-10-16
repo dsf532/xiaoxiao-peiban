@@ -22,7 +22,28 @@
   // 阿里云百炼的语音合成端点（2026-10 改版后的地址）
   var TTS_URL = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer";
   var TTS_MODEL_DEFAULT = "qwen-audio-3.0-tts-flash";
-  var SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
+  // 解锁 iOS / 微信 用的静音音频。
+  // 注意：必须是"有真实采样点"的音频，0 字节的 WAV 在 iOS 上解锁不住。
+  var _silentUrl = "";
+  function silentWavUrl() {
+    if (_silentUrl) return _silentUrl;
+    try {
+      var sr = 8000, n = 3000, bytes = 44 + n * 2;   // 0.375 秒 / 8kHz / 16bit 单声道
+      var buf = new ArrayBuffer(bytes);
+      var v = new DataView(buf);
+      var ws = function (off, s) { for (var i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+      ws(0, "RIFF"); v.setUint32(4, bytes - 8, true); ws(8, "WAVEfmt ");
+      v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+      v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+      ws(36, "data"); v.setUint32(40, n * 2, true);
+      _silentUrl = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+    } catch (e) {
+      _silentUrl = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
+    }
+    return _silentUrl;
+  }
+  // 兼容旧引用（旧版 0 字节静音，iOS 上解锁不住，已改用 silentWavUrl）
 
   var PRESETS = {
     deepseek: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-flash" },
@@ -84,6 +105,40 @@
 
   var voiceList = [];
   var primed = false;
+  var userGestured = false;      // 用户是否已经点过屏幕（手机上没这个就放不出声）
+  var pendingPlay = null;        // 被手机拦下的播放，等下一次点击再补放
+  var gestureArmed = false;
+  var lastTapHint = 0;
+
+  function hintTapToHear() {
+    var now = Date.now();
+    if (now - lastTapHint < 8000) return;
+    lastTapHint = now;
+    try { toast("点一下屏幕就能听到声音啦", 3600); } catch (e) {}
+  }
+
+  // 手机（尤其 iOS / 微信）要求播放必须发生在一次"点击"里。
+  // 被拦下时把请求存起来，用户下一次点屏幕就补放，而不是默默跳过。
+  function armGestureRetry() {
+    if (gestureArmed) return;
+    gestureArmed = true;
+    var fire = function () {
+      if (!gestureArmed) return;
+      gestureArmed = false;
+      evts.forEach(function (e) { window.removeEventListener(e, fire); });
+      userGestured = true;
+      primeSpeech();
+      var job = pendingPlay;
+      pendingPlay = null;
+      if (job) {
+        try { playUrl(job.url, job.finish, job.fallback); } catch (e) {}
+      }
+    };
+    // 只用"已完成"的手势（click / keydown）：触摸时会先在 touchend 触发，
+    // 那样会在点开故事的瞬间把问候语放出来又立刻被打断。
+    var evts = ["click", "keydown"];
+    evts.forEach(function (e) { window.addEventListener(e, fire, { passive: true }); });
+  }
 
   function loadVoices() {
     if (!("speechSynthesis" in window)) return;
@@ -110,12 +165,13 @@
   }
 
   function primeSpeech() {
+    userGestured = true;
     if (!primed) {
       primed = true;
       // 解锁 iOS 的音频播放：必须在用户手势里静音播一次
       try {
         var a = getAudioEl();
-        a.src = SILENT_WAV;
+        a.src = silentWavUrl();
         var p = a.play();
         if (p && p.catch) p.catch(function () {});
       } catch (e) {}
@@ -219,6 +275,7 @@
 
   var audioPlaying = false;
   var lastAudioUrl = "";
+  var lastAudioError = "";
 
   function playUrl(url, finish, fallback) {
     var done = false;
@@ -243,13 +300,30 @@
     try {
       var a = getAudioEl();
       a.onended = function () { settle(finish); };
-      a.onerror = function () { settle(fallback); };
+      a.onerror = function () {
+        lastAudioError = "音频加载失败（" + (a.error ? "code " + a.error.code : "网络") + "）";
+        settle(fallback);
+      };
       a.src = url;
       lastAudioUrl = url;
       audioPlaying = true;
       var p = a.play();
-      if (p && p.catch) p.catch(function () { settle(fallback); });
+      if (p && p.catch) p.catch(function (err) {
+        var name = (err && err.name) || "";
+        // 手机浏览器/微信把"非点击触发的播放"拦掉了 —— 这不是出错，
+        // 只是要等她点一下。别默默跳过，把这段存起来等她点。
+        if (!userGestured || /NotAllowed|Abort|interrupted|NotSupported/i.test(name)) {
+          lastAudioError = "被手机拦下了，等待点击（" + (name || "no-gesture") + "）";
+          pendingPlay = { url: url, finish: finish, fallback: fallback };
+          armGestureRetry();
+          hintTapToHear();
+          return;
+        }
+        lastAudioError = "播放失败：" + (name || "unknown");
+        settle(fallback);
+      });
     } catch (e) {
+      lastAudioError = "播放异常：" + ((e && e.message) || e);
       settle(fallback);
     }
   }
@@ -291,6 +365,7 @@
   }
 
   function stopSpeaking() {
+    pendingPlay = null;
     try { if ("speechSynthesis" in window) window.speechSynthesis.cancel(); } catch (e) {}
     try { if (audioEl) { audioEl.onended = null; audioEl.onerror = null; audioEl.pause(); } } catch (e) {}
     audioPlaying = false;
@@ -1185,10 +1260,14 @@
   });
 
   $("previewBtn").addEventListener("click", function () {
+    lastAudioError = "";
     if (cloneVoiceReady()) {
       toast("正在用你的声音合成…", 9000);
       speak("今天也要开心呀，我一直都在。", function () {
-        toast("如果没听到声音，检查一下百炼的 Key 和音色 ID", 4200);
+        window.setTimeout(function () {
+          if (audioPlaying) return;
+          toast(lastAudioError ? "没出声：" + lastAudioError : "如果没听到声音，检查一下百炼的 Key 和音色 ID", 5200);
+        }, 900);
       });
     } else {
       speak("今天也要开心呀，我一直都在。");
@@ -1334,7 +1413,7 @@
     if ("speechSynthesis" in window) window.speechSynthesis.onvoiceschanged = loadVoices;
     if (activated) toast("配对成功，可以开始聊天了");
 
-    ["pointerdown", "touchstart", "keydown"].forEach(function (evt) {
+    ["pointerdown", "touchstart", "keydown", "pointerup", "touchend", "click"].forEach(function (evt) {
       window.addEventListener(evt, primeSpeech, { once: true, passive: true });
     });
 
@@ -1354,6 +1433,9 @@
     openStory: openStory,
     closeStory: closeStory,
     lastAudio: function () { return lastAudioUrl; },
+    lastAudioError: function () { return lastAudioError; },
+    pendingPlay: function () { return pendingPlay ? pendingPlay.url : null; },
+    userGestured: function () { return userGestured; },
     audioPaused: function () { return audioEl ? audioEl.paused : true; },
     speaking: function () { return speaking; }
   };
